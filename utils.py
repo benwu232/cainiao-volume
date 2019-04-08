@@ -26,6 +26,11 @@ SZ = 224
 BS = 32
 NUM_WORKERS = 0
 
+path_voc = pdir.data/'voc/VOC2012'
+voc_img = path_voc/'JPEGImages'
+voc_ori_lbl = path_voc/'SegmentationClass'
+voc_lbl = pdir.data/'voc_new_lbl'
+
 USE_CUDA = torch.cuda.is_available()
 device = torch.device("cuda" if USE_CUDA else "cpu")
 
@@ -73,39 +78,41 @@ def encode_segmap(mask):
     mask = mask.astype(int)
     label_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.int16)
     for ii, label in enumerate(get_pascal_labels()):
-        label_mask[np.where(np.all(mask == label, axis=-1))[:2]] = ii
+        label_mask[np.where(np.all(mask == label, axis=-1))[:2]] = (ii != 0)
     label_mask = label_mask.astype(int)
     return label_mask
 
+def gen_new_lbl(ori_lbl_path, new_lbl_path):
+    # conver masks and save them
+    new_lbl_path.mkdir()
+    lbl_names = get_image_files(ori_lbl_path)
+    for lname in lbl_names:
+        mask = open_mask(lname, convert_mode='RGB')
+        # mask.show(alpha=1)
+        # mask.data.unique()
 
+        mask = mask.data.numpy().astype(int).transpose(1, 2, 0)
+        new_mask = encode_segmap(mask)
+        new_image = PIL.Image.fromarray(new_mask.astype(np.uint8))
+        new_image.save(new_lbl_path / f'{lname.name}')
 
+def stem2file(stem, suffix='jpg'):
+    return f'{stem}.{suffix}'
 
+def df_stem2file(df, suffix='jpg'):
+    for k in range(len(df)):
+        df.at[k, 'file'] = stem2file(df.loc[k, 'file'], suffix)
+    return df
 
+#get_y_fn = lambda x: voc_lbl/f'{Path(x).stem}.png'
 
+def get_y_fn(fname, lbl_path=voc_lbl):
+    return lbl_path/f'{Path(fname).stem}.png'
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def acc_camvid(input, target):
+    target = target.squeeze(1)
+    mask = target != 0
+    return (input.argmax(dim=1)[mask]==target[mask]).float().mean()
 
 
 

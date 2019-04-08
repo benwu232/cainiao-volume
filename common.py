@@ -79,7 +79,7 @@ def linear_decay(step, pars):
 
 
 class BaseDirs():
-    def __init__(self, root_path='/media/wb/backup/work/whale', data_path='input'):
+    def __init__(self, root_path='', data_path='input'):
         dir_list = []
         if root_path == '':
             self.root = Path().resolve().parent
