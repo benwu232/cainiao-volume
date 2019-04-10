@@ -7,6 +7,7 @@ import datetime as dt
 import time
 import tqdm
 import fastai
+import cv2
 from fastai.vision import *
 from fastai.basic_data import *
 from fastai.metrics import accuracy
@@ -114,6 +115,23 @@ def acc_camvid(input, target):
     mask = target != 0
     return (input.argmax(dim=1)[mask]==target[mask]).float().mean()
 
+
+def clean_mask(mask_file):
+    #mask_file.shape
+    mask = cv2.imread(mask_file)
+    mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+    #cv2.imshow('Image', mask)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
+    closed = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    cv_mask = cv2.cvtColor(mask_file, cv2.COLOR_GRAY2BGR)
+
+
+    #clean noisy points, the points whose neighbours are black
+
+
+    #clean the area which are near the boundary
 
 
 

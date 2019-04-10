@@ -19,6 +19,12 @@ def now2str(format="%Y-%m-%d__%H-%M-%S"):
     # str_time = time.strftime("%Y-%b-%d-%H-%M-%S", time.localtime(time.time()))
     return dt.datetime.now().strftime(format)
 
+def set_par(pars, key, key_default):
+    if key in pars:
+        return pars[key]
+    else:
+        return key_default
+
 def save_dump(dump_data, out_file):
     with open(out_file, 'wb') as fp:
         print('Writing to %s.' % out_file)

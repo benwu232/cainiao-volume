@@ -1,0 +1,62 @@
+
+
+n_process: 6
+
+task:
+  name: &task_name 'Segmentation'
+
+model:
+  backbone: 'resnet34'
+  #backbone: 'resnet18'
+  #backbone: 'resnet34'
+  #backbone: 'resnet50'
+  pars:
+    #n_emb: 512
+    n_emb: 1024
+    radius: 70
+    margin: 0.5
+    n_class: 5005
+    drop_rate: 0.5
+    pretrained: True
+
+
+train:
+  img_size: 448
+  model_file: 'seg_stage2'
+  #pretrained_file: 'Arc_11'
+  #pretrained_file: 'Arc-coarse-resnet18'
+  pretrained_file: 'seg_stage1'
+  #pretrained_file: ~
+  find_lr: False
+  #lr: !!float 1e-3
+  lr: [!!float 1e-6, !!float 1e-5, !!float 1e-4]
+  dir: './train_logs/densenet121.1st'
+  batch_size: 4
+  n_epoch: 100
+  pct_start: 0.5
+
+val:
+  cal_metric_once: True
+  batch_size: 32
+
+loss:
+  #name: 'cross_entropy'
+
+  name: 'ArcFace'
+  radius: 70
+  margin: 0.5
+
+  #name: 'CosFace'
+  #radius: 70
+  #margin: 0.35
+
+transform:
+  name: 'align_transform'
+  num_preprocessor: 6
+  params:
+    size: 320
+    align: True
+    align_p: 0.5
+
+scoreboard:
+  len: 11

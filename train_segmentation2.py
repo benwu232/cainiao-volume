@@ -56,13 +56,13 @@ def run(config):
     val_idxes = all_seg_list[:400]
     transform = get_transforms(do_flip=True, flip_vert=True,
                                   p_lighting=0.9, max_lighting=0.6,
-                                  max_rotate=20,
-                                  max_zoom=1.2,
+                                  max_rotate=90,
+                                  max_zoom=1.5,
                                   p_affine=0.9,
                                   xtra_tfms=[
-                                      RandTransform(tfm=TfmCoord (jitter), kwargs={'magnitude': 0.02}),
+                                      RandTransform(tfm=TfmCoord (jitter), kwargs={'magnitude': 0.03}),
                                       RandTransform(tfm=TfmCoord (symmetric_warp), kwargs={'magnitude': (-0.2, 0.2)}),
-                                      RandTransform(tfm=TfmPixel (cutout), kwargs={'n_holes': (2, 6), 'length': (10, 40)}),
+                                      RandTransform(tfm=TfmPixel (cutout), kwargs={'n_holes': (3, 6), 'length': (40, 60)}),
 
                                   ],
                                   )
@@ -72,7 +72,7 @@ def run(config):
            .label_from_func(get_y_fn, classes=[0, 1])
           )
 
-    data = (src.transform(get_transforms(), size=img_size, tfm_y=True)
+    data = (src.transform(transform, size=img_size, tfm_y=True)
            .databunch(bs=batch_size, num_workers=config.n_process)
            .normalize(imagenet_stats))
 
@@ -89,9 +89,6 @@ def run(config):
         lr_find(learn)
         learn.recorder.plot()
         plt.savefig('lr_find.png')
-
-    learn.fit_one_cycle(5, 1e-3, pct_start=0.8)
-    learn.save('stage-coarse')
 
     lr = config.train.lr
     if len(lr) == 1:

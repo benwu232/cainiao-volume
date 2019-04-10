@@ -29,6 +29,8 @@ def run(config):
     batch_size = config.train.batch_size
     model_file = config.train.model_file
 
+
+
     if not voc_lbl.exists():
         gen_new_lbl(voc_ori_lbl, voc_lbl)
     #exit()
@@ -71,17 +73,43 @@ def run(config):
            .split_by_idx(val_idxes)
            .label_from_func(get_y_fn, classes=[0, 1])
           )
+    #src.add_test_folder(pdir.data/'data'/'nuanping', label=0)
 
-    data = (src.transform(get_transforms(), size=img_size, tfm_y=True)
+    data = (src.transform(transform, size=img_size, tfm_y=True)
            .databunch(bs=batch_size, num_workers=config.n_process)
            .normalize(imagenet_stats))
 
     learn = unet_learner(data, models.resnet34, metrics=acc_camvid, wd=1e-2, model_dir=pdir.models)
 
-    pretrain = config.train.pretrained_file
-    if pretrain:
-        print(f'loading {pretrain} ...')
-        learn.load(pretrain)
+    learn.load('Segmentation-resnet34_9')
+
+    path = pdir.data/'data'/'nuanping'
+    file_name = path/'00000022.jpg'
+
+    #path = pdir.data/'data/objects'
+    #file_name = path/'nuanping2.jpg'
+
+    #img = open_image(file_name)
+    img = PIL.Image.open(file_name).convert('RGB')
+
+    img = img.resize((224, 224))
+    img_t = pil2tensor(img, np.float32)
+    img_t = (img_t/255).to(device)
+    img_t = normalize(img_t.double(), torch.tensor(imagenet_means).to(device), torch.tensor(imagenet_std).to(device))
+
+    with torch.no_grad():
+        result = learn.model(img_t.unsqueeze(0).float())
+        mask = (torch.sigmoid(result[0][1])>0.5)
+
+        mask *= 255
+        im2 = PIL.Image.fromarray(mask.detach().cpu().numpy())
+        #im2.show()
+        im2.save('mask.png')
+
+    #clean image, remove small points
+    clean_mask('mask.png')
+
+    #find minimum bounding box
 
 
     if config.train.find_lr:
