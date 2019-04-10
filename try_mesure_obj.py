@@ -107,43 +107,15 @@ def run(config):
         im2.save('mask.png')
 
     #clean image, remove small points
-    clean_mask('mask.png')
+    image = cv2.imread('mask.png')
+    mask = cv2.imread('mask.png', cv2.IMREAD_GRAYSCALE)
+    mask = clean_img(mask)
 
     #find minimum bounding box
+    length, width = cal_min_area_rect(mask, image)
+    print(length, width)
 
 
-    if config.train.find_lr:
-        print('finding lr ...')
-        lr_find(learn)
-        learn.recorder.plot()
-        plt.savefig('lr_find.png')
-
-    learn.fit_one_cycle(5, 1e-3, pct_start=0.8)
-    learn.save('stage-coarse')
-
-    lr = config.train.lr
-    if len(lr) == 1:
-        lrs = slice(lr)
-    elif len(lr) == 2:
-        lrs = slice(lr[0], lr[1])
-    elif len(lr) == 3:
-        lrs = slice(lr[0], lr[1], lr[2])
-    else:
-        print('wrong lrs')
-        exit()
-
-    learn.unfreeze()
-    cb_save_model = SaveModelCallback(learn, every="epoch", name=name)
-    cbs = [cb_save_model]
-    learn.fit_one_cycle(config.train.n_epoch,
-                        lrs,
-                        pct_start=config.train.pct_start,
-                        callbacks=cbs)
-
-    #print(f'saving to {model_file} ...')
-    #learn.save(model_file)
-
-    learn.show_results(rows=3, figsize=(8, 9))
 
 
 def parse_args():
@@ -163,7 +135,7 @@ def main():
     args = parse_args()
     if args.config_file is None:
         #raise Exception('no configuration file')
-        args.config_file = 'yaml/seg.yml'
+        args.config_file = 'yaml/seg-224.yml'
 
     config = load_config(args.config_file)
     pprint.PrettyPrinter(indent=2).pprint(config)
@@ -174,5 +146,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 
