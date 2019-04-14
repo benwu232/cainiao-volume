@@ -155,5 +155,76 @@ def cal_min_area_rect(bin_img, ori_img=None):
     return length, width
 
 
+BKG_THRESH = 0
+def preprocess_image(image):
+    """Returns a grayed, blurred, and adaptively thresholded camera image."""
+
+    gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray,(5,5),0)
+
+    # The best threshold level depends on the ambient lighting conditions.
+    # For bright lighting, a high threshold must be used to isolate the cards
+    # from the background. For dim lighting, a low threshold must be used.
+    # To make the card detector independent of lighting conditions, the
+    # following adaptive threshold method is used.
+    #
+    # A background pixel in the center top of the image is sampled to determine
+    # its intensity. The adaptive threshold is set at 50 (THRESH_ADDER) higher
+    # than that. This allows the threshold to adapt to the lighting conditions.
+    img_w, img_h = np.shape(image)[:2]
+    bkg_level = gray[int(img_h/100)][int(img_w/2)]
+    thresh_level = bkg_level + BKG_THRESH
+
+    retval, thresh = cv2.threshold(blur,thresh_level,255,cv2.THRESH_BINARY)
+
+    return thresh
+
+def find_cards(thresh_image):
+    """Finds all card-sized contours in a thresholded camera image.
+    Returns the number of cards, and a list of card contours sorted
+    from largest to smallest."""
+
+    # Find contours and sort their indices by contour size
+    dummy,cnts,hier = cv2.findContours(thresh_image,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+    index_sort = sorted(range(len(cnts)), key=lambda i : cv2.contourArea(cnts[i]),reverse=True)
+
+    # If there are no contours, do nothing
+    if len(cnts) == 0:
+        return [], []
+
+    # Otherwise, initialize empty sorted contour and hierarchy lists
+    cnts_sort = []
+    hier_sort = []
+    cnt_is_card = np.zeros(len(cnts),dtype=int)
+
+    # Fill empty lists with sorted contour and sorted hierarchy. Now,
+    # the indices of the contour list still correspond with those of
+    # the hierarchy list. The hierarchy array can be used to check if
+    # the contours have parents or not.
+    for i in index_sort:
+        cnts_sort.append(cnts[i])
+        hier_sort.append(hier[0][i])
+
+    # Determine which of the contours are cards by applying the
+    # following criteria: 1) Smaller area than the maximum card size,
+    # 2), bigger area than the minimum card size, 3) have no parents,
+    # and 4) have four corners
+
+    for i in range(len(cnts_sort)):
+        size = cv2.contourArea(cnts_sort[i])
+        peri = cv2.arcLength(cnts_sort[i],True)
+        approx = cv2.approxPolyDP(cnts_sort[i],0.01*peri,True)
+
+        if ((size < CARD_MAX_AREA) and (size > CARD_MIN_AREA)
+            and (hier_sort[i][3] == -1) and (len(approx) == 4)):
+            cnt_is_card[i] = 1
+
+    return cnts_sort, cnt_is_card
 
 
+def gen_bcd_set():
+    path_bg = pdir.data/'data/bg'
+    path_box = pdir.data/'data/box'
+    path_card = [pdir.data/f'data/{subdir}' for subdir in ['bankcard', 'creditcard', 'idcard1', 'idcard2']]
+
+    pass

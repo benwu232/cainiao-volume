@@ -25,11 +25,15 @@ from utils import *
 def run(config):
     name = f'{config.task.name}-{config.model.backbone}'
 
+    gen_bcd_set()
+
+
+
+
+
     img_size = config.train.img_size
     batch_size = config.train.batch_size
     model_file = config.train.model_file
-
-
 
     if not voc_lbl.exists():
         gen_new_lbl(voc_ori_lbl, voc_lbl)
@@ -73,49 +77,51 @@ def run(config):
            .split_by_idx(val_idxes)
            .label_from_func(get_y_fn, classes=[0, 1])
           )
-    #src.add_test_folder(pdir.data/'data'/'nuanping', label=0)
 
-    data = (src.transform(transform, size=img_size, tfm_y=True)
+    data = (src.transform(get_transforms(), size=img_size, tfm_y=True)
            .databunch(bs=batch_size, num_workers=config.n_process)
            .normalize(imagenet_stats))
 
     learn = unet_learner(data, models.resnet34, metrics=acc_camvid, wd=1e-2, model_dir=pdir.models)
 
-    learn.load('Segmentation-resnet34_9')
-
-    path = pdir.data/'data'/'nuanping'
-    file_name = path/'00000022.jpg'
-
-    #path = pdir.data/'data/objects'
-    #file_name = path/'nuanping2.jpg'
-
-    #img = open_image(file_name)
-    img = PIL.Image.open(file_name).convert('RGB')
-
-    img = img.resize((224, 224))
-    img_t = pil2tensor(img, np.float32)
-    img_t = (img_t/255).to(device)
-    img_t = normalize(img_t.double(), torch.tensor(imagenet_means).to(device), torch.tensor(imagenet_std).to(device))
-
-    with torch.no_grad():
-        result = learn.model(img_t.unsqueeze(0).float())
-        mask = (torch.sigmoid(result[0][1])>0.5)
-
-        mask *= 255
-        im2 = PIL.Image.fromarray(mask.detach().cpu().numpy())
-        #im2.show()
-        im2.save('mask.png')
-
-    #clean image, remove small points
-    image = cv2.imread('mask.png')
-    mask = cv2.imread('mask.png', cv2.IMREAD_GRAYSCALE)
-    mask = clean_img(mask)
-
-    #find minimum bounding box
-    length, width = cal_min_area_rect(mask, image)
-    print(length, width)
+    pretrain = config.train.pretrained_file
+    if pretrain:
+        print(f'loading {pretrain} ...')
+        learn.load(pretrain)
 
 
+    if config.train.find_lr:
+        print('finding lr ...')
+        lr_find(learn)
+        learn.recorder.plot()
+        plt.savefig('lr_find.png')
+
+    learn.fit_one_cycle(5, 1e-3, pct_start=0.8)
+    learn.save('stage-coarse')
+
+    lr = config.train.lr
+    if len(lr) == 1:
+        lrs = slice(lr)
+    elif len(lr) == 2:
+        lrs = slice(lr[0], lr[1])
+    elif len(lr) == 3:
+        lrs = slice(lr[0], lr[1], lr[2])
+    else:
+        print('wrong lrs')
+        exit()
+
+    learn.unfreeze()
+    cb_save_model = SaveModelCallback(learn, every="epoch", name=name)
+    cbs = [cb_save_model]
+    learn.fit_one_cycle(config.train.n_epoch,
+                        lrs,
+                        pct_start=config.train.pct_start,
+                        callbacks=cbs)
+
+    #print(f'saving to {model_file} ...')
+    #learn.save(model_file)
+
+    learn.show_results(rows=3, figsize=(8, 9))
 
 
 def parse_args():
@@ -135,7 +141,7 @@ def main():
     args = parse_args()
     if args.config_file is None:
         #raise Exception('no configuration file')
-        args.config_file = 'yaml/seg-224.yml'
+        args.config_file = 'yaml/seg.yml'
 
     config = load_config(args.config_file)
     pprint.PrettyPrinter(indent=2).pprint(config)
@@ -146,6 +152,5 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
 
